@@ -1,0 +1,256 @@
+---
+title: "430 Project2"
+author: "Sarah"
+date: "2019/12/5"
+output:
+  word_document: default
+  pdf_document: default
+---
+I. Introduction$\\$
+The Nasdaq Stock Market is an American stock exchange located at One Liberty Plaza in New York City. It is ranked second on the list of stock exchanges by market capitalization of shares traded, behind only the New York Stock Exchange.The exchange platform is owned by Nasdaq, Inc., which also owns the Nasdaq Nordic stock market network and several U.S. stock and options exchanges.$\\$
+$\\$
+Amazon.com, Inc., is an American multinational technology company based in Seattle that focuses on e-commerce, cloud computing, digital streaming, and artificial intelligence. Amazon is known for well-established industries through technological innovation. It is the world's largest online marketplace, AI assistant provider, and cloud computing platform as measured by revenue and market capitalization. $\\$
+$\\$
+For this project, we collect data of Nasdaq Stock and Amazon stock price from January 1998 to November 2019 from Yahoo Finance. We pick adjusted close price as our dependent variable. By making time series models for both companies, we want to investigate whether there are trends, seasonalities, or cycles in the models. Also, we try to fit a VAR model by using both data of Nasdaq and Amazon stock, and see if Nasdaq value is a good predictor of Amazon stock price.$\\$
+$\\$
+
+II. Results 
+```{r}
+library(readxl)
+stock <- read_excel("/Users/sunshaoyang/Desktop/NASDAQAMZN.xlsx")
+```
+
+```{r}
+library(psych)
+describe(stock)
+```
+
+```{r}
+nasd=ts(stock$NASDAQ,start=1998.1,freq=12)
+amzn=ts(stock$AMZN,start=1998.1,freq=12)
+plot(nasd, main="NASDAQ")
+plot(amzn, main="Amazon")
+```
+1. Produce a time-series plot of your data including the respective ACF and PACF plots.
+```{r}
+par(mfrow=c(3,1))
+acf(nasd, type = "covariance", main="Autocovariance", lag.max=30, ylab="NASDAQ COV")
+acf(nasd, type = "correlation", main="Autocorrelation", lag.max=30, ylab= "NASDAQ ACF")
+acf(nasd, type = "partial",main="Partial Autocorrelation",lag.max=30, ylab="NASDAQ PACF")
+```
+
+```{r}
+par(mfrow=c(3,1))
+acf(amzn, type = "covariance", main="Autocovariance", lag.max=30, ylab="Amazon COV")
+acf(amzn, type = "correlation", main="Autocorrelation", lag.max=30, ylab= "Amazon ACF")
+acf(amzn, type = "partial",main="Partial Autocorrelation",lag.max=30, ylab="Amazon PACF")
+```
+
+2. As a baseline model, fit an ARIMA model to each series and comment on the fit. For the next questions, you will instead use the model estimated in (3) for their respective answers.
+```{r}
+library(forecast)
+library(tseries)
+auto.arima(nasd)
+```
+According to the result of auto.arima, we can conclude the model has one-period difference cycle, seasonal-MA(1) monthly seasonality and 26.0452 drift.
+
+```{r}
+auto.arima(amzn)
+```
+According to the result of auto.arima, we choose the second-period difference, original MA(2) cycle, and seasonal MA(1) as our baseline model of AMZN data.$\\$
+$\\$
+
+3. Fit a model that includes, trend, seasonality and cyclical components. Make sure to discuss your model in detail.
+```{r}
+model_nasd=Arima(nasd, order=c(0,1,0), seasonal=list(order=c(0,0,1)),include.drift = TRUE)
+summary(model_nasd)
+```
+```{r}
+library(lmtest)
+coeftest(model_nasd)
+```
+The model for NASDAQ has one-period difference as cycle, seasonaly MA(1) monthly as seasonaliy and 26.045171 as drift. According to the result of coefficient test, we can conclude that all of the coefficients are statistically significant at 5% confidence level.$\\$
+
+```{r}
+model_amzn=Arima(amzn, order=c(0,2,2), seasonal=list(order=c(0,0,1)))
+summary(model_amzn)
+```
+
+```{r}
+coeftest(model_amzn)
+```
+The baseline model of amzn is 2 periods differenced, MA(2) cycle, seasonal MA(1). According to the coefficients test, the coefficients of cycle are significant under 5% significance level.
+
+4. Plot the respective residuals vs. fitted values and discuss your observations.
+```{r}
+plot(model_nasd$fitted, model_nasd$residuals)
+```
+According to the plot of residuals vs. fitted values of model NASDAQ, we could conclude that the residuals distribute around 0 randomly. And there is no heterskedasticity almostly.
+
+```{r}
+plot(model_amzn$fitted, model_amzn$residuals)
+```
+Most of the residuals of the amzn model is distributed around zero randomly with several extreme values.$\\$
+$\\$
+
+5. Plot the ACF and PACF of the respective residuals and interpret the plots.
+```{r}
+par(mfrow=c(3,1))
+acf(model_nasd$residuals, type = "covariance", main="Autocovariance", lag.max=30, ylab="model_nasd residuals COV")
+acf(model_nasd$residuals, type = "correlation", main="Autocorrelation", lag.max=30, ylab= "model_nasd residuals ACF")
+acf(model_nasd$residuals, type = "partial",main="Partial Autocorrelation",lag.max=30, ylab="model_nasd residuals PACF")
+```
+According to the ACF and PACF plots of residuals in model NASDAQ, there is no spike in these two plots which means the residuals are white noise and there is no pattern left in the estimated model.
+
+```{r}
+par(mfrow=c(3,1))
+acf(model_amzn$residuals, type = "covariance", main="Autocovariance", lag.max=30, ylab="model_amzn residuals COV")
+acf(model_amzn$residuals, type = "correlation", main="Autocorrelation", lag.max=30, ylab= "model_amzn residuals ACF")
+acf(model_amzn$residuals, type = "partial",main="Partial Autocorrelation",lag.max=30, ylab="model_amzn residuals PACF")
+```
+
+
+```{r}
+plot(model_amzn$residuals)
+```
+According to the acf and pacf plots of residuals, we found some spikes, or significant correlations in it and there may be missing factors in the arima model.$\\$
+$\\$
+
+6. Plot the respective CUSUM and interpret the plot.
+```{r}
+library(strucchange)
+y=recresid(model_nasd$residuals~1)
+plot(efp(model_nasd$residuals~1, type = "Rec-CUSUM"))
+```
+According to the Recursive CUSUM plot, we could conclude that even though the residual does not equal to 0 exactly, they are between the bond.
+
+```{r}
+plot(y, pch=16,ylab="Recursive Residuals")
+```
+Recursive estimates provide information about parameter stability. From the Recursive Residuals plot, the residuals are stable in the middle periods, and the residuals are more scattered in the first and last several periods.
+
+```{r}
+y=recresid(model_amzn$res~1)
+plot(efp(model_amzn$res~1, type = "Rec-CUSUM"))
+```
+The residuals vary around zero before 2015, and the variance rises when it's around 2018 but it still in the red lines range.
+
+```{r}
+plot(y, pch=16,ylab="Recursive Residuals")
+```
+The recursive estimates provide infomation about the stability of the residuals. From the Recursive Residuals plot, the residuals are stable from the beginning, and there are some extreme values in the recent two years.$\\$
+$\\$
+
+8. For your model, discuss the associated diagnostic statistics.
+```{r}
+accuracy(model_nasd)
+```
+```{r}
+accuracy(model_amzn)
+```
+According to the error metrics, the root mean of standard error is about 48, which is much smaller than the RMSE of the whole market. In other words, the deviation between the observed values and the truth values are smaller in amzn model.$\\$
+According to the error metrics, we can get the associated diagnostic statistics to show goodness of fit. Based on these indicators (ME, MPE, MAPE, MASE, etc.), we conclude that the two estimated models are good to fit the true value and have good forecasting performance. $\\$
+$\\$
+
+9. Use your model to forecast 12-steps ahead. Your forecast should include the respective error bands.
+```{r}
+plot(forecast(model_nasd,h=12))
+```
+
+
+```{r}
+plot(forecast(model_amzn,h=12))
+```
+
+10. Fit an appropriate VAR model using your two variables. Make sure to show the relevant plots and discuss your results from the fit.
+```{r}
+library(vars) 
+y=cbind(nasd,amzn)
+y_tot=data.frame(y)
+VARselect(y_tot, 10)
+```
+
+```{r}
+var_model=VAR(y_tot,p=8)
+summary(var_model)
+```
+
+
+According to the VAR plot, when taking nasd as the dependent variable and the nasd lags and amzn lags as independent variables, the var model fit the true values well and the residuals are almost randomly vary arround 0 even though the residuals in the first and last seveal periods are more scattered.
+
+```{r}
+irf(var_model)
+plot(irf(var_model, n.ahead=12))
+```
+According to the implulse response plots, we could conclude that after 1 unit shock of NASDAQ, NASDAQ has initially a large movement in starts at all times, and Amazon has initially a little movement in starts at all times. After 1 unit shock of Amazon, NASDAQ initially produces no movement then builds up, reaching the lowest point around 6 months and then the effect decays slowly.$\\$
+$\\$
+
+12. Perform a Granger-Causality test on your variables and discuss your results from the test.
+```{r}
+grangertest(nasd ~ amzn, order = 8)
+```
+According to the results of Granger-Causality test, we could conclude that Amazon is the Granger-Cause of NASDAQ because the test is statistically significant.
+
+```{r}
+grangertest(amzn ~ nasd, order = 8)
+```
+According to the results of Granger-Causality test, we could conclude that NASDAQ is not the Granger-Cause of Amazon because the test is not statistically significant.$\\$
+$\\$
+
+13. Use your VAR model to forecast 12-steps ahead. Your forecast should include the respective error bands. Comment on the differences between the two forecasts (VAR vs. ARIMA).$\\$
+The difference between the VAR and ARIMA models is that VAR model includes more infomation to forecast. Both of the amzn lags and nasd lags are included in the VAR model and the ARIMA models include amzn only or nasd only for forecast.
+```{r}
+var.predict = predict(object=var_model, n.ahead=12)
+plot(var.predict)
+```
+```{r}
+AIC(var_model,model_nasd,model_amzn)
+BIC(var_model,model_nasd,model_amzn)
+```
+According to the results of AIC and BIC, the ARIMA models (model_nasd and model_amzn) have smaller AIC and BIC, which means the estimations are more close to true values and the models are better. As a result, the ARIMA models have better prediction.
+
+14. Backtest your ARIMA model. Begin by partitioning your data set into an estimation set and a prediction set.
+(a) Use a recursive backtesting scheme, and forecast 12-steps ahead at each iteration. Compute the mean absolute percentage error at each step. Provide a plot showing the MAPE over each iteration.
+
+
+```{r}
+library(greybox)
+ourCall="predict(arima(amzn,order=c(0,2,2)),n.ahead=h)"
+ourValue="pred"
+# separation : training 78 test 185
+returnedValues1=ro(amzn,h=12,origins = 78,call=ourCall,value = ourValue,ci=F,co=T)
+l_f12_mape_eachstep=apply(abs(returnedValues1$holdout-returnedValues1$pred),1,mean,na.rm=TRUE)/ mean(returnedValues1$actuals)
+plot(l_f12_mape_eachstep,main="AMZN Recursive 12-step MAPE each step")
+```
+
+```{r}
+ourCall_N <- "predict(arima(nasd,order=c(0,1,0)),n.ahead=h)"
+ourValue <- "pred"
+N_returnedValues1 <- ro(nasd, h=12,origins = 68, call=ourCall_N, value=ourValue)
+N_returnedValues2 = ro(nasd,h=1,origins = 79,call=ourCall_N, value=ourValue)
+h_f12_MAPE_eachstep=apply(abs(N_returnedValues1$holdout - N_returnedValues1$pred),1,mean,na.rm=TRUE) / mean(N_returnedValues1$actuals)
+plot(h_f12_MAPE_eachstep, main='NASDAQ Recursive 12-step MAPE each step')
+```
+
+(b) Shorten your forecast horizon to only 1-step ahead. Compute the absolute percentage error at each iteration, and plot.
+```{r}
+N_returnedValues2 = ro(nasd,h=1,origins = 79,call=ourCall_N, value=ourValue)
+h_f12_MAPE_eachstep=apply(abs(N_returnedValues1$holdout - N_returnedValues1$pred),1,mean,na.rm=TRUE) / mean(N_returnedValues1$actuals)
+l_f1_recursive_APE_eachiteration=apply(abs(N_returnedValues2$holdout - N_returnedValues2$pred),1,mean,na.rm=TRUE) / mean(N_returnedValues2$actuals)
+plot(l_f1_recursive_APE_eachiteration, main='1-step AMZN Recursive APE at each iteration')
+```
+```{r}
+h_f1_recursive_APE_eachiteration=apply(abs(N_returnedValues2$holdout - N_returnedValues2$pred),1,mean,na.rm=TRUE) / mean(N_returnedValues2$actuals)
+plot(h_f1_recursive_APE_eachiteration, main='1-step NASDAQ Recursive APE at each iteration')
+```
+
+Conclusion
+Based on our result in Granger-Causality test, there is no casual effect between Nasdqe and Amazon stock price. Both Nasdqe and Amazon stock price show a positive trend based on our forecast. However, the stock market is highly volatile and unpredictable. In the future, there may be government policies or global issue that affect the trend of Nasdqe index and Amazon stock prices.
+
+
+References
+Amazon.com, Inc. (AMZN) Stock Price, Quote, History & News. (2019, December 12). Retrieved from https://finance.yahoo.com/quote/AMZN?p=AMZN.
+NASDAQ Composite (^IXIC) Charts, Data & News. (2019, December 13). Retrieved from https://finance.yahoo.com/quote/^IXIC?p=^IXIC.
+Amazon (company). (2019, December 9). Retrieved from
+https://en.wikipedia.org/wiki/Amazon_(company).
+Nasdaq. (2019, November 30). Retrieved from https://en.wikipedia.org/wiki/Nasdaq.
